@@ -147,13 +147,6 @@ step-nodejs-headers-build: &step-nodejs-headers-build
       cd src
       ninja -C out/Default third_party/electron_node:headers
 
-step-native-tests-build: &step-native-tests-build
-  run:
-    name: Native tests build
-    command: |
-      cd src
-      ninja -C out/Default electron:electron_tests
-
 step-persist-data-for-tests: &step-persist-data-for-tests
   persist_to_workspace:
     root: .
@@ -330,9 +323,22 @@ steps-native-tests: &steps-native-tests
     - *step-setup-env-for-build
 
     - *step-electron-gn-gen
-    - *step-native-tests-build
-
-    # TODO(alexeykuzmin): Run the tests. It can be extremely parallelized!
+    - run:
+        name: Build native tests
+        command: |
+          cd src
+          ninja -C out/Default electron:electron_tests
+    - run:
+        name: Run native tests
+        command: |
+          cd src
+          mkdir tests_results
+          python electron/script/run-tests.py --config electron/script/tests.yml --tests-dir out/Default --output-dir tests_results
+    - store_artifacts:
+        path: src/tests_results
+        destination: results
+    - store_test_results:
+        path: src/tests_results
 
 steps-verify-ffmpeg: &steps-verify-ffmpeg
   steps:
@@ -623,6 +629,7 @@ workflows:
       - linux-arm-checkout
       - linux-arm64-checkout
 
+      # FIXME
       - linux-x64-native-tests-fyi:
           requires:
             - linux-checkout
@@ -710,6 +717,10 @@ workflows:
       - linux-checkout
       - linux-arm-checkout
       - linux-arm64-checkout
+
+      - linux-x64-native-tests-fyi:
+          requires:
+            - linux-checkout
 
       - linux-x64-release:
           requires:
